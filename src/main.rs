@@ -3,6 +3,8 @@ use tracing_subscriber::layer::SubscriberExt;
 #[derive(Debug, clap::Parser)]
 struct CliArgs {
     package_folder: std::path::PathBuf,
+    #[clap(long, default_value = "80")]
+    port: u16,
 }
 
 fn main() {
@@ -43,7 +45,7 @@ fn main() {
                 .nest("/simple/", rypi::api::simple_index())
                 .with_state(state);
 
-            let bind_addr = format!("0.0.0.0:8080");
+            let bind_addr = format!("0.0.0.0:{}", args.port);
             let listener = tokio::net::TcpListener::bind(bind_addr).await.unwrap();
 
             axum::serve(listener, app).await.unwrap();
