@@ -29,13 +29,32 @@ fn main() {
         projects: std::collections::HashMap::new(),
     }));
 
+    let (update_trigger, trigger_recv) = tokio::sync::mpsc::unbounded_channel();
+
     runtime.spawn_blocking({
         let state = state.clone();
         let config = rypi::Config {
             base: std::path::PathBuf::from(args.package_folder.clone()),
         };
 
-        move || rypi::update(config, state)
+        move || rypi::update(config, state, trigger_recv)
+    });
+
+    runtime.spawn({
+        let trigger = update_trigger.clone();
+
+        async move {
+            loop {
+                if let Err(e) = trigger.send(rypi::UpdateTrigger {
+                    source: std::borrow::Cow::Borrowed("Timer")
+                }) {
+                    tracing::error!("Sending timer trigger");
+                    return;
+                }
+
+                tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+            }
+        }
     });
 
     runtime.block_on(async move {
@@ -51,7 +70,9 @@ fn main() {
             axum::serve(listener, app).await.unwrap();
         });
 
-        api_handle.await
+        if let Err(e) = api_handle.await {
+            tracing::error!("{:?}", e);
+        }
     });
 }
 

@@ -17,8 +17,25 @@ pub struct Config {
     pub base: std::path::PathBuf,
 }
 
-pub fn update(config: Config, state: Arc<RwLock<State>>) {
+#[derive(Debug)]
+pub struct UpdateTrigger {
+    pub source: std::borrow::Cow<'static, str>,
+}
+
+pub fn update(config: Config, state: Arc<RwLock<State>>, mut trigger: tokio::sync::mpsc::UnboundedReceiver<UpdateTrigger>) {
     loop {
+        let trigger = match trigger.blocking_recv() {
+            Some(t) => t,
+            None => {
+                tracing::info!("Triggers have been closed");
+                return;
+            }
+        };
+
+        let _entered = tracing::info_span!("triggered", ?trigger).entered();
+
+        tracing::info!("Starting update");
+
         match update_inner(&config.base) {
             Ok(files) => {
                 let mut guard = state.blocking_write();
@@ -45,7 +62,7 @@ pub fn update(config: Config, state: Arc<RwLock<State>>) {
             }
         };
 
-        std::thread::sleep(std::time::Duration::from_secs(30));
+        tracing::info!("Done updating");
     }
 }
 
