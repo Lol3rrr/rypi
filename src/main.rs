@@ -46,7 +46,7 @@ fn main() {
         async move {
             loop {
                 if let Err(e) = trigger.send(rypi::UpdateTrigger {
-                    source: std::borrow::Cow::Borrowed("Timer")
+                    source: std::borrow::Cow::Borrowed("Timer"),
                 }) {
                     tracing::error!("Sending timer trigger");
                     return;
